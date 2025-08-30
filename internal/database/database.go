@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/julimonteiro/cupcake-store/internal/config"
+	"github.com/julimonteiro/cupcake-store/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -44,6 +45,6 @@ func Init(cfg *config.Config) (db *gorm.DB, err error) {
 
 func runMigrations(db *gorm.DB) error {
 	return db.AutoMigrate(
-	// TODO
+		&models.Cupcake{},
 	)
 }
