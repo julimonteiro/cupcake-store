@@ -9,5 +9,6 @@ type CupcakeRepositoryInterface interface {
 	FindAll() ([]models.Cupcake, error)
 	Update(cupcake *models.Cupcake) error
 	Delete(id uint) error
+	Exists(id uint) (bool, error)
 }
 

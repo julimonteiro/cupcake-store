@@ -41,3 +41,9 @@ func (r *CupcakeRepository) Update(cupcake *models.Cupcake) error {
 func (r *CupcakeRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Cupcake{}, id).Error
 }
+
+func (r *CupcakeRepository) Exists(id uint) (bool, error) {
+	var count int64
+	err := r.db.Model(&models.Cupcake{}).Where("id = ?", id).Count(&count).Error
+	return count > 0, err
+}
