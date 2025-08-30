@@ -33,3 +33,11 @@ func (r *CupcakeRepository) FindAll() ([]models.Cupcake, error) {
 	err := r.db.Find(&cupcakes).Error
 	return cupcakes, err
 }
+
+func (r *CupcakeRepository) Update(cupcake *models.Cupcake) error {
+	return r.db.Save(cupcake).Error
+}
+
+func (r *CupcakeRepository) Delete(id uint) error {
+	return r.db.Delete(&models.Cupcake{}, id).Error
+}
