@@ -18,3 +18,18 @@ func NewCupcakeRepository(db *gorm.DB) *CupcakeRepository {
 func (r *CupcakeRepository) Create(cupcake *models.Cupcake) error {
 	return r.db.Create(cupcake).Error
 }
+
+func (r *CupcakeRepository) FindByID(id uint) (*models.Cupcake, error) {
+	var cupcake models.Cupcake
+	err := r.db.First(&cupcake, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &cupcake, nil
+}
+
+func (r *CupcakeRepository) FindAll() ([]models.Cupcake, error) {
+	var cupcakes []models.Cupcake
+	err := r.db.Find(&cupcakes).Error
+	return cupcakes, err
+}
