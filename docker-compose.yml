@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: cupcake_postgres
+    environment:
+      POSTGRES_DB: cupcake_store
+      POSTGRES_USER: cupcake_user
+      POSTGRES_PASSWORD: cupcake_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cupcake_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cupcake_user -d cupcake_store"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Cupcake Store Application
+  app:
+    build: .
+    container_name: cupcake_app
+    environment:
+      PORT: 8080
+      DB_DIALECT: postgres
+      DB_DSN: host=postgres user=cupcake_user password=cupcake_pass dbname=cupcake_store port=5432 sslmode=disable
+      LOG_LEVEL: info
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cupcake_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  cupcake_network:
+    driver: bridge
+
