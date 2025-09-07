@@ -5,213 +5,253 @@ import (
 
 	"github.com/julimonteiro/cupcake-store/internal/models"
 	"github.com/julimonteiro/cupcake-store/internal/repository"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
-type MockCupcakeRepository struct {
-	mock.Mock
+func setupTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+
+	err = db.AutoMigrate(&models.Cupcake{})
+	require.NoError(t, err)
+
+	return db
 }
 
-var _ repository.CupcakeRepositoryInterface = (*MockCupcakeRepository)(nil)
+func newTestService(t *testing.T) *CupcakeService {
+	t.Helper()
 
-func (m *MockCupcakeRepository) Create(cupcake *models.Cupcake) error {
-	args := m.Called(cupcake)
-	return args.Error(0)
+	db := setupTestDB(t)
+	repo := repository.NewCupcakeRepository(db)
+	return NewCupcakeService(repo)
 }
 
-func (m *MockCupcakeRepository) FindByID(id uint) (*models.Cupcake, error) {
-	args := m.Called(id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.Cupcake), args.Error(1)
-}
-
-func (m *MockCupcakeRepository) FindAll() ([]models.Cupcake, error) {
-	args := m.Called()
-	return args.Get(0).([]models.Cupcake), args.Error(1)
-}
-
-func (m *MockCupcakeRepository) Update(cupcake *models.Cupcake) error {
-	args := m.Called(cupcake)
-	return args.Error(0)
-}
-
-func (m *MockCupcakeRepository) Delete(id uint) error {
-	args := m.Called(id)
-	return args.Error(0)
-}
-
-func (m *MockCupcakeRepository) Exists(id uint) (bool, error) {
-	args := m.Called(id)
-	return args.Bool(0), args.Error(1)
-}
-
-func TestCreateCupcake_ValidRequest(t *testing.T) {
-	mockRepo := new(MockCupcakeRepository)
-	service := NewCupcakeService(mockRepo)
+func TestCreate_SuccessAndDefaults(t *testing.T) {
+	service := newTestService(t)
 
 	req := &models.CreateCupcakeRequest{
-		Name:       "Special Chocolate",
-		Flavor:     "Belgian Chocolate",
+		Name:       " Brigadeiro ",
+		Flavor:     " Chocolate ",
+		PriceCents: 1299,
+	}
+
+	cupcake, err := service.CreateCupcake(req)
+
+	require.NoError(t, err)
+	require.NotNil(t, cupcake)
+	require.Greater(t, cupcake.ID, uint(0))
+	require.Equal(t, "Brigadeiro", cupcake.Name)
+	require.Equal(t, "Chocolate", cupcake.Flavor)
+	require.Equal(t, 1299, cupcake.PriceCents)
+	require.True(t, cupcake.IsAvailable)
+}
+
+func TestCreate_ValidationErrors(t *testing.T) {
+	service := newTestService(t)
+
+	tests := []struct {
+		name        string
+		req         *models.CreateCupcakeRequest
+		expectedErr string
+	}{
+		{
+			name: "name too short",
+			req: &models.CreateCupcakeRequest{
+				Name:       "A",
+				Flavor:     "X",
+				PriceCents: 1,
+			},
+			expectedErr: "name must have at least 2 characters",
+		},
+		{
+			name: "empty flavor",
+			req: &models.CreateCupcakeRequest{
+				Name:       "Ok",
+				Flavor:     "",
+				PriceCents: 1,
+			},
+			expectedErr: "flavor is required",
+		},
+		{
+			name: "invalid price",
+			req: &models.CreateCupcakeRequest{
+				Name:       "Ok",
+				Flavor:     "Vanilla",
+				PriceCents: 0,
+			},
+			expectedErr: "price must be greater than zero",
+		},
+		{
+			name: "empty name",
+			req: &models.CreateCupcakeRequest{
+				Name:       "",
+				Flavor:     "Chocolate",
+				PriceCents: 1000,
+			},
+			expectedErr: "name is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cupcake, err := service.CreateCupcake(tt.req)
+
+			require.Error(t, err)
+			require.Nil(t, cupcake)
+			require.Contains(t, err.Error(), tt.expectedErr)
+		})
+	}
+}
+
+func TestList_ReturnsInsertedItems(t *testing.T) {
+	service := newTestService(t)
+
+	req1 := &models.CreateCupcakeRequest{
+		Name:       "Chocolate",
+		Flavor:     "Belgian",
 		PriceCents: 1500,
 	}
+	cupcake1, err := service.CreateCupcake(req1)
+	require.NoError(t, err)
 
-	expectedCupcake := &models.Cupcake{
-		Name:        "Special Chocolate",
-		Flavor:      "Belgian Chocolate",
-		PriceCents:  1500,
-		IsAvailable: true,
+	req2 := &models.CreateCupcakeRequest{
+		Name:       "Vanilla",
+		Flavor:     "Madagascar",
+		PriceCents: 1200,
 	}
+	cupcake2, err := service.CreateCupcake(req2)
+	require.NoError(t, err)
 
-	mockRepo.On("Create", mock.AnythingOfType("*models.Cupcake")).Return(nil)
+	cupcakes, err := service.GetAllCupcakes()
 
-	result, err := service.CreateCupcake(req)
+	require.NoError(t, err)
+	require.Len(t, cupcakes, 2)
 
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, expectedCupcake.Name, result.Name)
-	assert.Equal(t, expectedCupcake.Flavor, result.Flavor)
-	assert.Equal(t, expectedCupcake.PriceCents, result.PriceCents)
-	assert.Equal(t, expectedCupcake.IsAvailable, result.IsAvailable)
-	mockRepo.AssertExpectations(t)
+	require.Equal(t, cupcake1.ID, cupcakes[0].ID)
+	require.Equal(t, cupcake2.ID, cupcakes[1].ID)
+	require.Equal(t, "Chocolate", cupcakes[0].Name)
+	require.Equal(t, "Vanilla", cupcakes[1].Name)
 }
 
-func TestCreateCupcake_InvalidName(t *testing.T) {
-	mockRepo := new(MockCupcakeRepository)
-	service := NewCupcakeService(mockRepo)
+func TestGet_Update_Delete(t *testing.T) {
+	service := newTestService(t)
 
 	req := &models.CreateCupcakeRequest{
-		Name:       "A",
-		Flavor:     "Belgian Chocolate",
-		PriceCents: 1500,
+		Name:       "Original",
+		Flavor:     "Original",
+		PriceCents: 1000,
+	}
+	created, err := service.CreateCupcake(req)
+	require.NoError(t, err)
+
+	retrieved, err := service.GetCupcake(created.ID)
+	require.NoError(t, err)
+	require.Equal(t, created.ID, retrieved.ID)
+	require.Equal(t, "Original", retrieved.Name)
+	require.Equal(t, "Original", retrieved.Flavor)
+	require.Equal(t, 1000, retrieved.PriceCents)
+	require.True(t, retrieved.IsAvailable)
+
+	updateReq := &models.UpdateCupcakeRequest{
+		Name:       stringPtr("Updated Name"),
+		Flavor:     stringPtr("Updated Flavor"),
+		PriceCents: intPtr(2000),
 	}
 
-	result, err := service.CreateCupcake(req)
+	updated, err := service.UpdateCupcake(created.ID, updateReq)
+	require.NoError(t, err)
+	require.Equal(t, created.ID, updated.ID)
+	require.Equal(t, "Updated Name", updated.Name)
+	require.Equal(t, "Updated Flavor", updated.Flavor)
+	require.Equal(t, 2000, updated.PriceCents)
+	require.True(t, updated.IsAvailable)
 
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "name must have at least 2 characters")
+	err = service.DeleteCupcake(created.ID)
+	require.NoError(t, err)
+
+	_, err = service.GetCupcake(created.ID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "record not found")
 }
 
-func TestCreateCupcake_EmptyName(t *testing.T) {
-	mockRepo := new(MockCupcakeRepository)
-	service := NewCupcakeService(mockRepo)
+func TestUpdate_ValidationErrors(t *testing.T) {
+	service := newTestService(t)
 
 	req := &models.CreateCupcakeRequest{
-		Name:       "",
-		Flavor:     "Belgian Chocolate",
-		PriceCents: 1500,
+		Name:       "Test",
+		Flavor:     "Test",
+		PriceCents: 1000,
+	}
+	created, err := service.CreateCupcake(req)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		updateReq   *models.UpdateCupcakeRequest
+		expectedErr string
+	}{
+		{
+			name: "name too short",
+			updateReq: &models.UpdateCupcakeRequest{
+				Name: stringPtr("A"),
+			},
+			expectedErr: "name must have at least 2 characters",
+		},
+		{
+			name: "invalid price",
+			updateReq: &models.UpdateCupcakeRequest{
+				PriceCents: intPtr(0),
+			},
+			expectedErr: "price must be greater than zero",
+		},
 	}
 
-	result, err := service.CreateCupcake(req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := service.UpdateCupcake(created.ID, tt.updateReq)
 
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "name is required")
-}
-
-func TestCreateCupcake_EmptyFlavor(t *testing.T) {
-	mockRepo := new(MockCupcakeRepository)
-	service := NewCupcakeService(mockRepo)
-
-	req := &models.CreateCupcakeRequest{
-		Name:       "Special Chocolate",
-		Flavor:     "",
-		PriceCents: 1500,
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.expectedErr)
+		})
 	}
-
-	result, err := service.CreateCupcake(req)
-
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "flavor is required")
 }
 
-func TestCreateCupcake_InvalidPrice(t *testing.T) {
-	mockRepo := new(MockCupcakeRepository)
-	service := NewCupcakeService(mockRepo)
-
-	req := &models.CreateCupcakeRequest{
-		Name:       "Special Chocolate",
-		Flavor:     "Belgian Chocolate",
-		PriceCents: 0,
-	}
-
-	result, err := service.CreateCupcake(req)
-
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "price must be greater than zero")
-}
-
-func TestGetCupcake_Success(t *testing.T) {
-	mockRepo := new(MockCupcakeRepository)
-	service := NewCupcakeService(mockRepo)
-
-	expectedCupcake := &models.Cupcake{
-		ID:          1,
-		Name:        "Special Chocolate",
-		Flavor:      "Belgian Chocolate",
-		PriceCents:  1500,
-		IsAvailable: true,
-	}
-
-	mockRepo.On("FindByID", uint(1)).Return(expectedCupcake, nil)
-
-	result, err := service.GetCupcake(1)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, expectedCupcake.ID, result.ID)
-	assert.Equal(t, expectedCupcake.Name, result.Name)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestGetAllCupcakes_Success(t *testing.T) {
-	mockRepo := new(MockCupcakeRepository)
-	service := NewCupcakeService(mockRepo)
-
-	expectedCupcakes := []models.Cupcake{
-		{ID: 1, Name: "Special Chocolate", Flavor: "Belgian Chocolate", PriceCents: 1500, IsAvailable: true},
-		{ID: 2, Name: "Vanilla", Flavor: "Vanilla", PriceCents: 1200, IsAvailable: true},
-	}
-
-	mockRepo.On("FindAll").Return(expectedCupcakes, nil)
-
-	result, err := service.GetAllCupcakes()
-
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Len(t, result, 2)
-	assert.Equal(t, expectedCupcakes[0].Name, result[0].Name)
-	assert.Equal(t, expectedCupcakes[1].Name, result[1].Name)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestDeleteCupcake_Success(t *testing.T) {
-	mockRepo := new(MockCupcakeRepository)
-	service := NewCupcakeService(mockRepo)
-
-	mockRepo.On("Exists", uint(1)).Return(true, nil)
-	mockRepo.On("Delete", uint(1)).Return(nil)
-
-	err := service.DeleteCupcake(1)
-
-	assert.NoError(t, err)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestDeleteCupcake_NotFound(t *testing.T) {
-	mockRepo := new(MockCupcakeRepository)
-	service := NewCupcakeService(mockRepo)
-
-	mockRepo.On("Exists", uint(999)).Return(false, nil)
+func TestDelete_NotFound(t *testing.T) {
+	service := newTestService(t)
 
 	err := service.DeleteCupcake(999)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cupcake not found")
+}
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cupcake not found")
-	mockRepo.AssertExpectations(t)
+func TestGet_NotFound(t *testing.T) {
+	service := newTestService(t)
+
+	_, err := service.GetCupcake(999)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "record not found")
+}
+
+func TestUpdate_NotFound(t *testing.T) {
+	service := newTestService(t)
+
+	updateReq := &models.UpdateCupcakeRequest{
+		Name: stringPtr("New Name"),
+	}
+
+	_, err := service.UpdateCupcake(999, updateReq)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cupcake not found")
+}
+
+func stringPtr(s string) *string {
+	return &s
+}
+
+func intPtr(i int) *int {
+	return &i
 }
