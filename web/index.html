@@ -31,7 +31,53 @@
             background: linear-gradient(135deg, #ff6b6b, #ee5a24);
             color: white;
             padding: 30px;
-            text-align: center;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header-text {
+            text-align: left;
+        }
+
+        .cart-icon {
+            position: relative;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cart-icon:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .cart-emoji {
+            font-size: 24px;
+        }
+
+        .cart-count {
+            background: #ff4757;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            min-width: 24px;
         }
 
         .header h1 {
@@ -124,6 +170,21 @@
             box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
         }
 
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .text-muted {
+            color: #6c757d;
+            font-style: italic;
+        }
+
         .table-section {
             background: white;
             border-radius: 10px;
@@ -214,6 +275,192 @@
             color: #666;
         }
 
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 15px 15px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+
+        .close {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.3s ease;
+        }
+
+        .close:hover {
+            opacity: 0.7;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        /* Cart Modal Styles */
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #e1e5e9;
+        }
+
+        .cart-item:last-child {
+            border-bottom: none;
+        }
+
+        .cart-item-info {
+            flex: 1;
+        }
+
+        .cart-item-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .cart-item-price {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .cart-item-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quantity-btn {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .quantity-btn:hover {
+            background: #f8f9fa;
+        }
+
+        .quantity-display {
+            min-width: 30px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .remove-item {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .remove-item:hover {
+            background: #c82333;
+        }
+
+        .cart-total {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: right;
+        }
+
+        .cart-total-amount {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        .empty-cart {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c757d;
+        }
+
+        .empty-cart-emoji {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
         @media (max-width: 768px) {
             .form-grid {
                 grid-template-columns: 1fr;
@@ -226,14 +473,56 @@
             .btn-small {
                 width: 100%;
             }
+
+            .modal-content {
+                margin: 10% auto;
+                width: 95%;
+            }
+
+            .modal-actions {
+                flex-direction: column;
+            }
+
+            .modal-actions .btn {
+                width: 100%;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+            }
+
+            .header-text {
+                text-align: center;
+            }
+
+            .cart-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .cart-item-controls {
+                width: 100%;
+                justify-content: space-between;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🧁 Cupcake Store</h1>
-            <p>Gourmet Cupcake Management</p>
+            <div class="header-content">
+                <div class="header-text">
+                    <h1>🧁 Cupcake Store</h1>
+                    <p>Gourmet Cupcake Management</p>
+                </div>
+                <div class="cart-icon" onclick="openCart()">
+                    <span class="cart-emoji">🛒</span>
+                    <span class="cart-count" id="cartCount">0</span>
+                </div>
+            </div>
         </div>
 
         <div class="content">
@@ -286,12 +575,83 @@
         </div>
     </div>
 
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Cupcake</h2>
+                <span class="close" onclick="closeEditModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editCupcakeForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="editName">Cupcake Name *</label>
+                            <input type="text" id="editName" name="name" required minlength="2" placeholder="Ex: Special Chocolate">
+                        </div>
+                        <div class="form-group">
+                            <label for="editFlavor">Flavor *</label>
+                            <input type="text" id="editFlavor" name="flavor" required placeholder="Ex: Belgian Chocolate">
+                        </div>
+                        <div class="form-group">
+                            <label for="editPrice">Price (cents) *</label>
+                            <input type="number" id="editPrice" name="price" required min="1" placeholder="Ex: 1500 ($15.00)">
+                        </div>
+                        <div class="form-group">
+                            <label for="editAvailable">Available</label>
+                            <select id="editAvailable" name="is_available">
+                                <option value="true">Available</option>
+                                <option value="false">Unavailable</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Cupcake</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart Modal -->
+    <div id="cartModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Shopping Cart</h2>
+                <span class="close" onclick="closeCart()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="cartItems">
+                    <!-- Cart items will be rendered here -->
+                </div>
+                <div id="cartTotal" class="cart-total" style="display: none;">
+                    <div>Total: <span class="cart-total-amount" id="totalAmount">$0.00</span></div>
+                </div>
+                <div class="modal-actions" id="cartActions" style="display: none;">
+                    <button type="button" class="btn btn-secondary" onclick="closeCart()">Continue Shopping</button>
+                    <button type="button" class="btn btn-primary" onclick="checkout()">Checkout</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = '/api/v1/cupcakes';
         
         const form = document.getElementById('cupcakeForm');
         const tableBody = document.getElementById('cupcakesTableBody');
         const alertsContainer = document.getElementById('alerts');
+        const editModal = document.getElementById('editModal');
+        const editForm = document.getElementById('editCupcakeForm');
+        const cartModal = document.getElementById('cartModal');
+        const cartItems = document.getElementById('cartItems');
+        const cartCount = document.getElementById('cartCount');
+        const cartTotal = document.getElementById('cartTotal');
+        const cartActions = document.getElementById('cartActions');
+        const totalAmount = document.getElementById('totalAmount');
+        let currentEditId = null;
+        let cart = JSON.parse(localStorage.getItem('cupcakeCart')) || [];
 
         function showAlert(message, type = 'success') {
             const alert = document.createElement('div');
@@ -351,9 +711,15 @@
                     </td>
                     <td>${formatDate(cupcake.created_at)}</td>
                     <td class="actions">
+                        <button class="btn btn-primary btn-small" onclick="editCupcake(${cupcake.id})">
+                            Edit
+                        </button>
                         <button class="btn btn-danger btn-small" onclick="deleteCupcake(${cupcake.id})">
                             Delete
                         </button>
+                        ${cupcake.is_available ? `<button class="btn btn-success btn-small" onclick="addToCart(${cupcake.id}, '${cupcake.name}', ${cupcake.price_cents})">
+                            Add to Cart
+                        </button>` : '<span class="text-muted">Unavailable</span>'}
                     </td>
                 </tr>
             `).join('');
@@ -407,6 +773,175 @@
             }
         }
 
+        async function editCupcake(id) {
+            try {
+                // Fetch the current cupcake data
+                const response = await fetch(`${API_BASE}/${id}`);
+                if (!response.ok) {
+                    throw new Error('Error loading cupcake data');
+                }
+
+                const cupcake = await response.json();
+                
+                // Populate the edit form with current data
+                document.getElementById('editName').value = cupcake.name;
+                document.getElementById('editFlavor').value = cupcake.flavor;
+                document.getElementById('editPrice').value = cupcake.price_cents;
+                document.getElementById('editAvailable').value = cupcake.is_available.toString();
+                
+                // Store the current edit ID
+                currentEditId = id;
+                
+                // Show the modal
+                editModal.style.display = 'block';
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error loading cupcake data', 'error');
+            }
+        }
+
+        function closeEditModal() {
+            editModal.style.display = 'none';
+            currentEditId = null;
+            editForm.reset();
+        }
+
+        async function updateCupcake(cupcakeData) {
+            try {
+                const response = await fetch(`${API_BASE}/${currentEditId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(cupcakeData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error);
+                }
+
+                showAlert('Cupcake updated successfully!');
+                closeEditModal();
+                loadCupcakes();
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert(error.message, 'error');
+            }
+        }
+
+        // Cart Functions
+        function saveCart() {
+            localStorage.setItem('cupcakeCart', JSON.stringify(cart));
+            updateCartCount();
+        }
+
+        function updateCartCount() {
+            const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+            cartCount.textContent = totalItems;
+        }
+
+        function addToCart(id, name, price) {
+            const existingItem = cart.find(item => item.id === id);
+            
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({
+                    id: id,
+                    name: name,
+                    price: price,
+                    quantity: 1
+                });
+            }
+            
+            saveCart();
+            showAlert(`${name} added to cart!`);
+        }
+
+        function removeFromCart(id) {
+            cart = cart.filter(item => item.id !== id);
+            saveCart();
+            renderCart();
+        }
+
+        function updateQuantity(id, change) {
+            const item = cart.find(item => item.id === id);
+            if (item) {
+                item.quantity += change;
+                if (item.quantity <= 0) {
+                    removeFromCart(id);
+                } else {
+                    saveCart();
+                    renderCart();
+                }
+            }
+        }
+
+        function openCart() {
+            renderCart();
+            cartModal.style.display = 'block';
+        }
+
+        function closeCart() {
+            cartModal.style.display = 'none';
+        }
+
+        function renderCart() {
+            if (cart.length === 0) {
+                cartItems.innerHTML = `
+                    <div class="empty-cart">
+                        <div class="empty-cart-emoji">🛒</div>
+                        <div>Your cart is empty</div>
+                        <div style="margin-top: 10px; font-size: 0.9em;">Add some delicious cupcakes!</div>
+                    </div>
+                `;
+                cartTotal.style.display = 'none';
+                cartActions.style.display = 'none';
+                return;
+            }
+
+            cartItems.innerHTML = cart.map(item => `
+                <div class="cart-item">
+                    <div class="cart-item-info">
+                        <div class="cart-item-name">${item.name}</div>
+                        <div class="cart-item-price">${formatPrice(item.price)} each</div>
+                    </div>
+                    <div class="cart-item-controls">
+                        <div class="quantity-controls">
+                            <button class="quantity-btn" onclick="updateQuantity(${item.id}, -1)">-</button>
+                            <span class="quantity-display">${item.quantity}</span>
+                            <button class="quantity-btn" onclick="updateQuantity(${item.id}, 1)">+</button>
+                        </div>
+                        <button class="remove-item" onclick="removeFromCart(${item.id})">Remove</button>
+                    </div>
+                </div>
+            `).join('');
+
+            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            totalAmount.textContent = formatPrice(total);
+            cartTotal.style.display = 'block';
+            cartActions.style.display = 'flex';
+        }
+
+        function checkout() {
+            if (cart.length === 0) {
+                showAlert('Your cart is empty!', 'error');
+                return;
+            }
+
+            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+            
+            if (confirm(`Proceed to checkout?\n\nItems: ${itemCount}\nTotal: ${formatPrice(total)}`)) {
+                // Clear cart after successful checkout
+                cart = [];
+                saveCart();
+                closeCart();
+                showAlert('Thank you for your purchase! Your order has been placed.', 'success');
+            }
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -435,7 +970,65 @@
             await createCupcake(cupcakeData);
         });
 
-        document.addEventListener('DOMContentLoaded', loadCupcakes);
+        // Edit form submission
+        editForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(editForm);
+            const cupcakeData = {
+                name: formData.get('name').trim(),
+                flavor: formData.get('flavor').trim(),
+                price_cents: parseInt(formData.get('price')),
+                is_available: formData.get('is_available') === 'true'
+            };
+
+            if (cupcakeData.name.length < 2) {
+                showAlert('Name must have at least 2 characters', 'error');
+                return;
+            }
+
+            if (cupcakeData.flavor.length === 0) {
+                showAlert('Flavor is required', 'error');
+                return;
+            }
+
+            if (cupcakeData.price_cents <= 0) {
+                showAlert('Price must be greater than zero', 'error');
+                return;
+            }
+
+            await updateCupcake(cupcakeData);
+        });
+
+        // Close modal when clicking outside of it
+        window.addEventListener('click', (event) => {
+            if (event.target === editModal) {
+                closeEditModal();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                if (editModal.style.display === 'block') {
+                    closeEditModal();
+                } else if (cartModal.style.display === 'block') {
+                    closeCart();
+                }
+            }
+        });
+
+        // Close cart modal when clicking outside of it
+        window.addEventListener('click', (event) => {
+            if (event.target === cartModal) {
+                closeCart();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCupcakes();
+            updateCartCount(); // Initialize cart count
+        });
     </script>
 </body>
 </html>
