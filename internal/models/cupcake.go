@@ -7,7 +7,7 @@ type Cupcake struct {
 	Name        string    `json:"name" gorm:"not null;size:100"`
 	Flavor      string    `json:"flavor" gorm:"not null;size:100"`
 	PriceCents  int       `json:"price_cents" gorm:"not null"`
-	IsAvailable bool      `json:"is_available" gorm:"default:true"`
+	IsAvailable bool      `json:"is_available"`
 	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }

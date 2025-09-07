@@ -48,14 +48,6 @@ func (s *CupcakeService) GetAllCupcakes() ([]models.Cupcake, error) {
 }
 
 func (s *CupcakeService) UpdateCupcake(id uint, req *models.UpdateCupcakeRequest) (*models.Cupcake, error) {
-	exists, err := s.repo.Exists(id)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.New("cupcake not found")
-	}
-
 	cupcake, err := s.repo.FindByID(id)
 	if err != nil {
 		return nil, err
@@ -92,14 +84,6 @@ func (s *CupcakeService) UpdateCupcake(id uint, req *models.UpdateCupcakeRequest
 }
 
 func (s *CupcakeService) DeleteCupcake(id uint) error {
-	exists, err := s.repo.Exists(id)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return errors.New("cupcake not found")
-	}
-
 	return s.repo.Delete(id)
 }
 
