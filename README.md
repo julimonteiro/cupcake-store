@@ -4,7 +4,7 @@ Uma aplicação web para gerenciamento de cupcakes gourmet, desenvolvida em Go c
 
 ## 📋 Características
 
-- **Backend**: Go 1.22 com Chi Router
+- **Backend**: Go 1.24.3 com Chi Router
 - **Banco de Dados**: SQLite (desenvolvimento) e PostgreSQL (produção)
 - **ORM**: GORM
 - **Frontend**: HTML + JavaScript puro
@@ -38,7 +38,7 @@ cupcake-store/
 
 ### Pré-requisitos
 
-- Go 1.22 ou superior
+- Go 1.24.3 ou superior
 - Docker e Docker Compose (opcional)
 
 ### Execução Local
