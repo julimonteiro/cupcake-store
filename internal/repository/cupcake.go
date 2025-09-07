@@ -39,7 +39,14 @@ func (r *CupcakeRepository) Update(cupcake *models.Cupcake) error {
 }
 
 func (r *CupcakeRepository) Delete(id uint) error {
-	return r.db.Delete(&models.Cupcake{}, id).Error
+	result := r.db.Delete(&models.Cupcake{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *CupcakeRepository) Exists(id uint) (bool, error) {

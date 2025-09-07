@@ -30,222 +30,571 @@ func newTestService(t *testing.T) *CupcakeService {
 	return NewCupcakeService(repo)
 }
 
-func TestCreate_SuccessAndDefaults(t *testing.T) {
-	service := newTestService(t)
-
-	req := &models.CreateCupcakeRequest{
-		Name:       " Brigadeiro ",
-		Flavor:     " Chocolate ",
-		PriceCents: 1299,
-	}
-
-	cupcake, err := service.CreateCupcake(req)
-
-	require.NoError(t, err)
-	require.NotNil(t, cupcake)
-	require.Greater(t, cupcake.ID, uint(0))
-	require.Equal(t, "Brigadeiro", cupcake.Name)
-	require.Equal(t, "Chocolate", cupcake.Flavor)
-	require.Equal(t, 1299, cupcake.PriceCents)
-	require.True(t, cupcake.IsAvailable)
-}
-
-func TestCreate_ValidationErrors(t *testing.T) {
-	service := newTestService(t)
-
+func TestCreateCupcake(t *testing.T) {
 	tests := []struct {
-		name        string
-		req         *models.CreateCupcakeRequest
-		expectedErr string
+		name             string
+		request          *models.CreateCupcakeRequest
+		expectedError    string
+		validateResponse func(t *testing.T, cupcake *models.Cupcake)
 	}{
 		{
-			name: "name too short",
-			req: &models.CreateCupcakeRequest{
+			name: "success with defaults",
+			request: &models.CreateCupcakeRequest{
+				Name:       " Brigadeiro ",
+				Flavor:     " Chocolate ",
+				PriceCents: 1299,
+			},
+			validateResponse: func(t *testing.T, cupcake *models.Cupcake) {
+				require.Greater(t, cupcake.ID, uint(0))
+				require.Equal(t, "Brigadeiro", cupcake.Name)
+				require.Equal(t, "Chocolate", cupcake.Flavor)
+				require.Equal(t, 1299, cupcake.PriceCents)
+				require.True(t, cupcake.IsAvailable)
+			},
+		},
+		{
+			name: "success with default availability",
+			request: &models.CreateCupcakeRequest{
+				Name:       "Vanilla Special",
+				Flavor:     "Madagascar Vanilla",
+				PriceCents: 1500,
+			},
+			validateResponse: func(t *testing.T, cupcake *models.Cupcake) {
+				require.Greater(t, cupcake.ID, uint(0))
+				require.Equal(t, "Vanilla Special", cupcake.Name)
+				require.Equal(t, "Madagascar Vanilla", cupcake.Flavor)
+				require.Equal(t, 1500, cupcake.PriceCents)
+				require.True(t, cupcake.IsAvailable)
+			},
+		},
+		{
+			name: "validation error - name too short",
+			request: &models.CreateCupcakeRequest{
 				Name:       "A",
 				Flavor:     "X",
 				PriceCents: 1,
 			},
-			expectedErr: "name must have at least 2 characters",
+			expectedError: "name must have at least 2 characters",
 		},
 		{
-			name: "empty flavor",
-			req: &models.CreateCupcakeRequest{
-				Name:       "Ok",
+			name: "validation error - empty flavor",
+			request: &models.CreateCupcakeRequest{
+				Name:       "Valid Name",
 				Flavor:     "",
-				PriceCents: 1,
-			},
-			expectedErr: "flavor is required",
-		},
-		{
-			name: "invalid price",
-			req: &models.CreateCupcakeRequest{
-				Name:       "Ok",
-				Flavor:     "Vanilla",
-				PriceCents: 0,
-			},
-			expectedErr: "price must be greater than zero",
-		},
-		{
-			name: "empty name",
-			req: &models.CreateCupcakeRequest{
-				Name:       "",
-				Flavor:     "Chocolate",
 				PriceCents: 1000,
 			},
-			expectedErr: "name is required",
+			expectedError: "flavor is required",
+		},
+		{
+			name: "validation error - zero price",
+			request: &models.CreateCupcakeRequest{
+				Name:       "Valid Name",
+				Flavor:     "Valid Flavor",
+				PriceCents: 0,
+			},
+			expectedError: "price must be greater than zero",
+		},
+		{
+			name: "validation error - negative price",
+			request: &models.CreateCupcakeRequest{
+				Name:       "Valid Name",
+				Flavor:     "Valid Flavor",
+				PriceCents: -100,
+			},
+			expectedError: "price must be greater than zero",
+		},
+		{
+			name: "validation error - empty name",
+			request: &models.CreateCupcakeRequest{
+				Name:       "",
+				Flavor:     "Valid Flavor",
+				PriceCents: 1000,
+			},
+			expectedError: "name is required",
+		},
+		{
+			name: "validation error - empty flavor with spaces",
+			request: &models.CreateCupcakeRequest{
+				Name:       "Valid Name",
+				Flavor:     "   ",
+				PriceCents: 1000,
+			},
+			expectedError: "flavor is required",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cupcake, err := service.CreateCupcake(tt.req)
+			service := newTestService(t)
 
-			require.Error(t, err)
-			require.Nil(t, cupcake)
-			require.Contains(t, err.Error(), tt.expectedErr)
+			cupcake, err := service.CreateCupcake(tt.request)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Nil(t, cupcake)
+				require.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, cupcake)
+				if tt.validateResponse != nil {
+					tt.validateResponse(t, cupcake)
+				}
+			}
 		})
 	}
 }
 
-func TestList_ReturnsInsertedItems(t *testing.T) {
-	service := newTestService(t)
-
-	req1 := &models.CreateCupcakeRequest{
-		Name:       "Chocolate",
-		Flavor:     "Belgian",
-		PriceCents: 1500,
-	}
-	cupcake1, err := service.CreateCupcake(req1)
-	require.NoError(t, err)
-
-	req2 := &models.CreateCupcakeRequest{
-		Name:       "Vanilla",
-		Flavor:     "Madagascar",
-		PriceCents: 1200,
-	}
-	cupcake2, err := service.CreateCupcake(req2)
-	require.NoError(t, err)
-
-	cupcakes, err := service.GetAllCupcakes()
-
-	require.NoError(t, err)
-	require.Len(t, cupcakes, 2)
-
-	require.Equal(t, cupcake1.ID, cupcakes[0].ID)
-	require.Equal(t, cupcake2.ID, cupcakes[1].ID)
-	require.Equal(t, "Chocolate", cupcakes[0].Name)
-	require.Equal(t, "Vanilla", cupcakes[1].Name)
-}
-
-func TestGet_Update_Delete(t *testing.T) {
-	service := newTestService(t)
-
-	req := &models.CreateCupcakeRequest{
-		Name:       "Original",
-		Flavor:     "Original",
-		PriceCents: 1000,
-	}
-	created, err := service.CreateCupcake(req)
-	require.NoError(t, err)
-
-	retrieved, err := service.GetCupcake(created.ID)
-	require.NoError(t, err)
-	require.Equal(t, created.ID, retrieved.ID)
-	require.Equal(t, "Original", retrieved.Name)
-	require.Equal(t, "Original", retrieved.Flavor)
-	require.Equal(t, 1000, retrieved.PriceCents)
-	require.True(t, retrieved.IsAvailable)
-
-	updateReq := &models.UpdateCupcakeRequest{
-		Name:       stringPtr("Updated Name"),
-		Flavor:     stringPtr("Updated Flavor"),
-		PriceCents: intPtr(2000),
-	}
-
-	updated, err := service.UpdateCupcake(created.ID, updateReq)
-	require.NoError(t, err)
-	require.Equal(t, created.ID, updated.ID)
-	require.Equal(t, "Updated Name", updated.Name)
-	require.Equal(t, "Updated Flavor", updated.Flavor)
-	require.Equal(t, 2000, updated.PriceCents)
-	require.True(t, updated.IsAvailable)
-
-	err = service.DeleteCupcake(created.ID)
-	require.NoError(t, err)
-
-	_, err = service.GetCupcake(created.ID)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "record not found")
-}
-
-func TestUpdate_ValidationErrors(t *testing.T) {
-	service := newTestService(t)
-
-	req := &models.CreateCupcakeRequest{
-		Name:       "Test",
-		Flavor:     "Test",
-		PriceCents: 1000,
-	}
-	created, err := service.CreateCupcake(req)
-	require.NoError(t, err)
-
+func TestGetCupcake(t *testing.T) {
 	tests := []struct {
-		name        string
-		updateReq   *models.UpdateCupcakeRequest
-		expectedErr string
+		name             string
+		cupcakeID        uint
+		setupCupcake     *models.CreateCupcakeRequest
+		expectedError    string
+		validateResponse func(t *testing.T, cupcake *models.Cupcake)
 	}{
 		{
-			name: "name too short",
-			updateReq: &models.UpdateCupcakeRequest{
-				Name: stringPtr("A"),
+			name:      "success - existing cupcake",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "Chocolate Special",
+				Flavor:     "Belgian Chocolate",
+				PriceCents: 1500,
 			},
-			expectedErr: "name must have at least 2 characters",
+			validateResponse: func(t *testing.T, cupcake *models.Cupcake) {
+				require.Equal(t, uint(1), cupcake.ID)
+				require.Equal(t, "Chocolate Special", cupcake.Name)
+				require.Equal(t, "Belgian Chocolate", cupcake.Flavor)
+				require.Equal(t, 1500, cupcake.PriceCents)
+			},
 		},
 		{
-			name: "invalid price",
-			updateReq: &models.UpdateCupcakeRequest{
-				PriceCents: intPtr(0),
-			},
-			expectedErr: "price must be greater than zero",
+			name:          "error - non-existent cupcake",
+			cupcakeID:     999,
+			expectedError: "record not found",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := service.UpdateCupcake(created.ID, tt.updateReq)
+			service := newTestService(t)
 
-			require.Error(t, err)
-			require.Contains(t, err.Error(), tt.expectedErr)
+			if tt.setupCupcake != nil {
+				createdCupcake, err := service.CreateCupcake(tt.setupCupcake)
+				require.NoError(t, err)
+				tt.cupcakeID = createdCupcake.ID
+			}
+
+			cupcake, err := service.GetCupcake(tt.cupcakeID)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Nil(t, cupcake)
+				require.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, cupcake)
+				if tt.validateResponse != nil {
+					tt.validateResponse(t, cupcake)
+				}
+			}
 		})
 	}
 }
 
-func TestDelete_NotFound(t *testing.T) {
-	service := newTestService(t)
-
-	err := service.DeleteCupcake(999)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "cupcake not found")
-}
-
-func TestGet_NotFound(t *testing.T) {
-	service := newTestService(t)
-
-	_, err := service.GetCupcake(999)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "record not found")
-}
-
-func TestUpdate_NotFound(t *testing.T) {
-	service := newTestService(t)
-
-	updateReq := &models.UpdateCupcakeRequest{
-		Name: stringPtr("New Name"),
+func TestGetAllCupcakes(t *testing.T) {
+	tests := []struct {
+		name             string
+		setupCupcakes    []*models.CreateCupcakeRequest
+		expectedCount    int
+		validateResponse func(t *testing.T, cupcakes []models.Cupcake)
+	}{
+		{
+			name:          "empty list",
+			setupCupcakes: []*models.CreateCupcakeRequest{},
+			expectedCount: 0,
+			validateResponse: func(t *testing.T, cupcakes []models.Cupcake) {
+				require.Len(t, cupcakes, 0)
+			},
+		},
+		{
+			name: "single cupcake",
+			setupCupcakes: []*models.CreateCupcakeRequest{
+				{
+					Name:       "Chocolate",
+					Flavor:     "Belgian",
+					PriceCents: 1500,
+				},
+			},
+			expectedCount: 1,
+			validateResponse: func(t *testing.T, cupcakes []models.Cupcake) {
+				require.Len(t, cupcakes, 1)
+				require.Equal(t, "Chocolate", cupcakes[0].Name)
+				require.Equal(t, "Belgian", cupcakes[0].Flavor)
+			},
+		},
+		{
+			name: "multiple cupcakes",
+			setupCupcakes: []*models.CreateCupcakeRequest{
+				{
+					Name:       "Chocolate",
+					Flavor:     "Belgian",
+					PriceCents: 1500,
+				},
+				{
+					Name:       "Vanilla",
+					Flavor:     "Madagascar",
+					PriceCents: 1200,
+				},
+			},
+			expectedCount: 2,
+			validateResponse: func(t *testing.T, cupcakes []models.Cupcake) {
+				require.Len(t, cupcakes, 2)
+				require.Equal(t, "Chocolate", cupcakes[0].Name)
+				require.Equal(t, "Vanilla", cupcakes[1].Name)
+			},
+		},
 	}
 
-	_, err := service.UpdateCupcake(999, updateReq)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "cupcake not found")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(t)
+
+			for _, cupcakeReq := range tt.setupCupcakes {
+				_, err := service.CreateCupcake(cupcakeReq)
+				require.NoError(t, err)
+			}
+
+			cupcakes, err := service.GetAllCupcakes()
+
+			require.NoError(t, err)
+			require.Len(t, cupcakes, tt.expectedCount)
+
+			if tt.validateResponse != nil {
+				tt.validateResponse(t, cupcakes)
+			}
+		})
+	}
+}
+
+func TestUpdateCupcake(t *testing.T) {
+	tests := []struct {
+		name             string
+		cupcakeID        uint
+		updateRequest    *models.UpdateCupcakeRequest
+		setupCupcake     *models.CreateCupcakeRequest
+		expectedError    string
+		validateResponse func(t *testing.T, cupcake *models.Cupcake)
+	}{
+		{
+			name:      "success - update all fields",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "Original Name",
+				Flavor:     "Original Flavor",
+				PriceCents: 1000,
+			},
+			updateRequest: &models.UpdateCupcakeRequest{
+				Name:        stringPtr("Updated Name"),
+				Flavor:      stringPtr("Updated Flavor"),
+				PriceCents:  intPtr(2000),
+				IsAvailable: boolPtr(false),
+			},
+			validateResponse: func(t *testing.T, cupcake *models.Cupcake) {
+				require.Equal(t, "Updated Name", cupcake.Name)
+				require.Equal(t, "Updated Flavor", cupcake.Flavor)
+				require.Equal(t, 2000, cupcake.PriceCents)
+				require.False(t, cupcake.IsAvailable)
+			},
+		},
+		{
+			name:      "success - partial update",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "Original Name",
+				Flavor:     "Original Flavor",
+				PriceCents: 1000,
+			},
+			updateRequest: &models.UpdateCupcakeRequest{
+				Name: stringPtr("Updated Name Only"),
+			},
+			validateResponse: func(t *testing.T, cupcake *models.Cupcake) {
+				require.Equal(t, "Updated Name Only", cupcake.Name)
+				require.Equal(t, "Original Flavor", cupcake.Flavor)
+				require.Equal(t, 1000, cupcake.PriceCents)
+			},
+		},
+		{
+			name:      "success - update with trimming",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "Original Name",
+				Flavor:     "Original Flavor",
+				PriceCents: 1000,
+			},
+			updateRequest: &models.UpdateCupcakeRequest{
+				Name:   stringPtr("  Updated Name  "),
+				Flavor: stringPtr("  Updated Flavor  "),
+			},
+			validateResponse: func(t *testing.T, cupcake *models.Cupcake) {
+				require.Equal(t, "Updated Name", cupcake.Name)
+				require.Equal(t, "Updated Flavor", cupcake.Flavor)
+			},
+		},
+		{
+			name:          "error - non-existent cupcake",
+			cupcakeID:     999,
+			updateRequest: &models.UpdateCupcakeRequest{Name: stringPtr("Updated")},
+			expectedError: "record not found",
+		},
+		{
+			name:      "validation error - name too short",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "Original Name",
+				Flavor:     "Original Flavor",
+				PriceCents: 1000,
+			},
+			updateRequest: &models.UpdateCupcakeRequest{
+				Name: stringPtr("A"),
+			},
+			expectedError: "name must have at least 2 characters",
+		},
+		{
+			name:      "validation error - zero price",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "Original Name",
+				Flavor:     "Original Flavor",
+				PriceCents: 1000,
+			},
+			updateRequest: &models.UpdateCupcakeRequest{
+				PriceCents: intPtr(0),
+			},
+			expectedError: "price must be greater than zero",
+		},
+		{
+			name:      "validation error - negative price",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "Original Name",
+				Flavor:     "Original Flavor",
+				PriceCents: 1000,
+			},
+			updateRequest: &models.UpdateCupcakeRequest{
+				PriceCents: intPtr(-100),
+			},
+			expectedError: "price must be greater than zero",
+		},
+		{
+			name:      "success - empty flavor with spaces",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "Original Name",
+				Flavor:     "Original Flavor",
+				PriceCents: 1000,
+			},
+			updateRequest: &models.UpdateCupcakeRequest{
+				Flavor: stringPtr("   "),
+			},
+			validateResponse: func(t *testing.T, cupcake *models.Cupcake) {
+				require.Equal(t, "", cupcake.Flavor)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(t)
+
+			if tt.setupCupcake != nil {
+				createdCupcake, err := service.CreateCupcake(tt.setupCupcake)
+				require.NoError(t, err)
+				tt.cupcakeID = createdCupcake.ID
+			}
+
+			cupcake, err := service.UpdateCupcake(tt.cupcakeID, tt.updateRequest)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Nil(t, cupcake)
+				require.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, cupcake)
+				if tt.validateResponse != nil {
+					tt.validateResponse(t, cupcake)
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteCupcake(t *testing.T) {
+	tests := []struct {
+		name          string
+		cupcakeID     uint
+		setupCupcake  *models.CreateCupcakeRequest
+		expectedError string
+	}{
+		{
+			name:      "success - existing cupcake",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "To Delete",
+				Flavor:     "Test Flavor",
+				PriceCents: 1000,
+			},
+		},
+		{
+			name:          "error - non-existent cupcake",
+			cupcakeID:     999,
+			expectedError: "record not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(t)
+
+			if tt.setupCupcake != nil {
+				createdCupcake, err := service.CreateCupcake(tt.setupCupcake)
+				require.NoError(t, err)
+				tt.cupcakeID = createdCupcake.ID
+			}
+
+			err := service.DeleteCupcake(tt.cupcakeID)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCreateCupcake_RepositoryError(t *testing.T) {
+	tests := []struct {
+		name          string
+		request       *models.CreateCupcakeRequest
+		expectedError string
+	}{
+		{
+			name: "repository error handling",
+			request: &models.CreateCupcakeRequest{
+				Name:       "Valid Name",
+				Flavor:     "Valid Flavor",
+				PriceCents: 1000,
+			},
+			expectedError: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(t)
+
+			cupcake, err := service.CreateCupcake(tt.request)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Nil(t, cupcake)
+				require.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, cupcake)
+			}
+		})
+	}
+}
+
+func TestUpdateCupcake_RepositoryError(t *testing.T) {
+	tests := []struct {
+		name          string
+		cupcakeID     uint
+		updateRequest *models.UpdateCupcakeRequest
+		setupCupcake  *models.CreateCupcakeRequest
+		expectedError string
+	}{
+		{
+			name:      "repository error handling",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "Original Name",
+				Flavor:     "Original Flavor",
+				PriceCents: 1000,
+			},
+			updateRequest: &models.UpdateCupcakeRequest{
+				Name: stringPtr("Updated Name"),
+			},
+			expectedError: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(t)
+
+			if tt.setupCupcake != nil {
+				createdCupcake, err := service.CreateCupcake(tt.setupCupcake)
+				require.NoError(t, err)
+				tt.cupcakeID = createdCupcake.ID
+			}
+
+			cupcake, err := service.UpdateCupcake(tt.cupcakeID, tt.updateRequest)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Nil(t, cupcake)
+				require.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, cupcake)
+			}
+		})
+	}
+}
+
+func TestDeleteCupcake_RepositoryError(t *testing.T) {
+	tests := []struct {
+		name          string
+		cupcakeID     uint
+		setupCupcake  *models.CreateCupcakeRequest
+		expectedError string
+	}{
+		{
+			name:      "repository error handling",
+			cupcakeID: 1,
+			setupCupcake: &models.CreateCupcakeRequest{
+				Name:       "To Delete",
+				Flavor:     "Test Flavor",
+				PriceCents: 1000,
+			},
+			expectedError: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(t)
+
+			if tt.setupCupcake != nil {
+				createdCupcake, err := service.CreateCupcake(tt.setupCupcake)
+				require.NoError(t, err)
+				tt.cupcakeID = createdCupcake.ID
+			}
+
+			err := service.DeleteCupcake(tt.cupcakeID)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func stringPtr(s string) *string {
@@ -254,4 +603,8 @@ func stringPtr(s string) *string {
 
 func intPtr(i int) *int {
 	return &i
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }

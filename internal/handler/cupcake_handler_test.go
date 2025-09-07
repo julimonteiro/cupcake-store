@@ -46,314 +46,614 @@ func newTestRouter(t *testing.T) chi.Router {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/cupcakes", func(r chi.Router) {
-			r.Get("/", handler.GetAllCupcakes)
 			r.Post("/", handler.CreateCupcake)
-			r.Route("/{id}", func(r chi.Router) {
-				r.Get("/", handler.GetCupcake)
-				r.Put("/", handler.UpdateCupcake)
-				r.Delete("/", handler.DeleteCupcake)
-			})
+			r.Get("/", handler.GetAllCupcakes)
+			r.Get("/{id}", handler.GetCupcake)
+			r.Put("/{id}", handler.UpdateCupcake)
+			r.Delete("/{id}", handler.DeleteCupcake)
 		})
 	})
 
 	return r
 }
 
-func TestCreateCupcake_Returns201AndBody(t *testing.T) {
-	router := newTestRouter(t)
-
-	reqBody := map[string]interface{}{
-		"name":        "Chocolate Special",
-		"flavor":      "Belgian Chocolate",
-		"price_cents": 1500,
+func TestCreateCupcake(t *testing.T) {
+	tests := []struct {
+		name             string
+		payload          map[string]interface{}
+		expectedStatus   int
+		expectedError    string
+		validateResponse func(t *testing.T, response models.Cupcake)
+	}{
+		{
+			name: "valid payload returns 201",
+			payload: map[string]interface{}{
+				"name":        "Chocolate Special",
+				"flavor":      "Belgian Chocolate",
+				"price_cents": 1500,
+			},
+			expectedStatus: http.StatusCreated,
+			validateResponse: func(t *testing.T, response models.Cupcake) {
+				require.Greater(t, response.ID, uint(0))
+				require.Equal(t, "Chocolate Special", response.Name)
+				require.Equal(t, "Belgian Chocolate", response.Flavor)
+				require.Equal(t, 1500, response.PriceCents)
+				require.True(t, response.IsAvailable)
+			},
+		},
+		{
+			name: "invalid payload - name too short",
+			payload: map[string]interface{}{
+				"name":        "A",
+				"flavor":      "X",
+				"price_cents": 1,
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "name must have at least 2 characters",
+		},
+		{
+			name: "invalid payload - empty flavor",
+			payload: map[string]interface{}{
+				"name":        "Valid Name",
+				"flavor":      "",
+				"price_cents": 1000,
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "flavor is required",
+		},
+		{
+			name: "invalid payload - zero price",
+			payload: map[string]interface{}{
+				"name":        "Valid Name",
+				"flavor":      "Valid Flavor",
+				"price_cents": 0,
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "price must be greater than zero",
+		},
+		{
+			name: "invalid payload - negative price",
+			payload: map[string]interface{}{
+				"name":        "Valid Name",
+				"flavor":      "Valid Flavor",
+				"price_cents": -100,
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "price must be greater than zero",
+		},
+		{
+			name: "invalid payload - empty name",
+			payload: map[string]interface{}{
+				"name":        "",
+				"flavor":      "Valid Flavor",
+				"price_cents": 1000,
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "name is required",
+		},
+		{
+			name: "invalid payload - missing required fields",
+			payload: map[string]interface{}{
+				"name": "Valid Name",
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "flavor is required",
+		},
+		{
+			name:           "invalid payload - empty object",
+			payload:        map[string]interface{}{},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "name is required",
+		},
 	}
 
-	jsonBody, err := json.Marshal(reqBody)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := newTestRouter(t)
 
-	req := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody))
-	req.Header.Set("Content-Type", "application/json")
+			jsonBody, err := json.Marshal(tt.payload)
+			require.NoError(t, err)
 
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+			req := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody))
+			req.Header.Set("Content-Type", "application/json")
 
-	require.Equal(t, http.StatusCreated, w.Code)
-	require.Equal(t, "application/json", w.Header().Get("Content-Type"))
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
 
-	var response models.Cupcake
-	err = json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
+			require.Equal(t, tt.expectedStatus, w.Code)
+			require.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
-	require.Greater(t, response.ID, uint(0))
-	require.Equal(t, "Chocolate Special", response.Name)
-	require.Equal(t, "Belgian Chocolate", response.Flavor)
-	require.Equal(t, 1500, response.PriceCents)
-	require.True(t, response.IsAvailable)
+			if tt.expectedError != "" {
+				require.Contains(t, w.Body.String(), tt.expectedError)
+			}
+
+			if tt.validateResponse != nil {
+				var response models.Cupcake
+				err = json.Unmarshal(w.Body.Bytes(), &response)
+				require.NoError(t, err)
+				tt.validateResponse(t, response)
+			}
+		})
+	}
 }
 
-func TestCreateCupcake_InvalidPayload_Returns400(t *testing.T) {
-	router := newTestRouter(t)
-
-	reqBody := map[string]interface{}{
-		"name":        "A",
-		"flavor":      "X",
-		"price_cents": 1,
+func TestCreateCupcake_InvalidJSON(t *testing.T) {
+	tests := []struct {
+		name           string
+		payload        string
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name:           "malformed JSON",
+			payload:        `{"name":"Test", "flavor":"Test", "price_cents":1000, "extra_field": "invalid"`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error decoding request",
+		},
+		{
+			name:           "invalid JSON syntax",
+			payload:        `{"name": "Test", "flavor": "Test", "price_cents": 1000,}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error decoding request",
+		},
+		{
+			name:           "empty string",
+			payload:        "",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error decoding request",
+		},
+		{
+			name:           "non-JSON string",
+			payload:        "invalid json",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error decoding request",
+		},
 	}
 
-	jsonBody, err := json.Marshal(reqBody)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := newTestRouter(t)
 
-	req := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody))
-	req.Header.Set("Content-Type", "application/json")
+			req := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBufferString(tt.payload))
+			req.Header.Set("Content-Type", "application/json")
 
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusBadRequest, w.Code)
-	require.Contains(t, w.Body.String(), "name must have at least 2 characters")
-}
-
-func TestCreateCupcake_InvalidJSON_Returns400(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBufferString("invalid json"))
-	req.Header.Set("Content-Type", "application/json")
-
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusBadRequest, w.Code)
-	require.Contains(t, w.Body.String(), "Error decoding request")
-}
-
-func TestListCupcakes_Returns200AndArray(t *testing.T) {
-	router := newTestRouter(t)
-
-	reqBody1 := map[string]interface{}{
-		"name":        "Chocolate",
-		"flavor":      "Belgian",
-		"price_cents": 1500,
+			require.Equal(t, tt.expectedStatus, w.Code)
+			require.Contains(t, w.Body.String(), tt.expectedError)
+		})
 	}
-	jsonBody1, _ := json.Marshal(reqBody1)
-	req1 := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody1))
-	req1.Header.Set("Content-Type", "application/json")
-	w1 := httptest.NewRecorder()
-	router.ServeHTTP(w1, req1)
-	require.Equal(t, http.StatusCreated, w1.Code)
+}
 
-	reqBody2 := map[string]interface{}{
-		"name":        "Vanilla",
-		"flavor":      "Madagascar",
-		"price_cents": 1200,
+func TestListCupcakes(t *testing.T) {
+	tests := []struct {
+		name             string
+		setupCupcakes    []map[string]interface{}
+		expectedStatus   int
+		expectedCount    int
+		validateResponse func(t *testing.T, response []models.Cupcake)
+	}{
+		{
+			name:           "empty list returns 200 with empty array",
+			setupCupcakes:  []map[string]interface{}{},
+			expectedStatus: http.StatusOK,
+			expectedCount:  0,
+			validateResponse: func(t *testing.T, response []models.Cupcake) {
+				require.Len(t, response, 0)
+			},
+		},
+		{
+			name: "single cupcake returns 200 with one item",
+			setupCupcakes: []map[string]interface{}{
+				{
+					"name":        "Chocolate",
+					"flavor":      "Belgian",
+					"price_cents": 1500,
+				},
+			},
+			expectedStatus: http.StatusOK,
+			expectedCount:  1,
+			validateResponse: func(t *testing.T, response []models.Cupcake) {
+				require.Len(t, response, 1)
+				require.Equal(t, "Chocolate", response[0].Name)
+				require.Equal(t, "Belgian", response[0].Flavor)
+				require.Equal(t, 1500, response[0].PriceCents)
+			},
+		},
+		{
+			name: "multiple cupcakes returns 200 with all items",
+			setupCupcakes: []map[string]interface{}{
+				{
+					"name":        "Chocolate",
+					"flavor":      "Belgian",
+					"price_cents": 1500,
+				},
+				{
+					"name":        "Vanilla",
+					"flavor":      "Madagascar",
+					"price_cents": 1200,
+				},
+			},
+			expectedStatus: http.StatusOK,
+			expectedCount:  2,
+			validateResponse: func(t *testing.T, response []models.Cupcake) {
+				require.Len(t, response, 2)
+				require.Equal(t, "Chocolate", response[0].Name)
+				require.Equal(t, "Vanilla", response[1].Name)
+			},
+		},
 	}
-	jsonBody2, _ := json.Marshal(reqBody2)
-	req2 := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody2))
-	req2.Header.Set("Content-Type", "application/json")
-	w2 := httptest.NewRecorder()
-	router.ServeHTTP(w2, req2)
-	require.Equal(t, http.StatusCreated, w2.Code)
 
-	req := httptest.NewRequest("GET", "/api/v1/cupcakes", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := newTestRouter(t)
 
-	require.Equal(t, http.StatusOK, w.Code)
-	require.Equal(t, "application/json", w.Header().Get("Content-Type"))
+			for _, cupcakeData := range tt.setupCupcakes {
+				jsonBody, _ := json.Marshal(cupcakeData)
+				req := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				router.ServeHTTP(w, req)
+				require.Equal(t, http.StatusCreated, w.Code)
+			}
 
-	var cupcakes []models.Cupcake
-	err := json.Unmarshal(w.Body.Bytes(), &cupcakes)
-	require.NoError(t, err)
-	require.Len(t, cupcakes, 2)
+			req := httptest.NewRequest("GET", "/api/v1/cupcakes", nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
 
-	require.Equal(t, "Chocolate", cupcakes[0].Name)
-	require.Equal(t, "Vanilla", cupcakes[1].Name)
-}
+			require.Equal(t, tt.expectedStatus, w.Code)
+			require.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
-func TestGetCupcake_NotFound_Returns404(t *testing.T) {
-	router := newTestRouter(t)
+			var response []models.Cupcake
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			require.NoError(t, err)
+			require.Len(t, response, tt.expectedCount)
 
-	req := httptest.NewRequest("GET", "/api/v1/cupcakes/9999", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusNotFound, w.Code)
-	require.Contains(t, w.Body.String(), "Cupcake not found")
-}
-
-func TestGetCupcake_InvalidID_Returns400(t *testing.T) {
-	router := newTestRouter(t)
-
-	req := httptest.NewRequest("GET", "/api/v1/cupcakes/invalid", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusBadRequest, w.Code)
-	require.Contains(t, w.Body.String(), "Invalid ID")
-}
-
-func TestGetCupcake_Success_Returns200(t *testing.T) {
-	router := newTestRouter(t)
-
-	reqBody := map[string]interface{}{
-		"name":        "Test Cupcake",
-		"flavor":      "Test Flavor",
-		"price_cents": 1000,
+			if tt.validateResponse != nil {
+				tt.validateResponse(t, response)
+			}
+		})
 	}
-	jsonBody, _ := json.Marshal(reqBody)
-	createReq := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody))
-	createReq.Header.Set("Content-Type", "application/json")
-	createW := httptest.NewRecorder()
-	router.ServeHTTP(createW, createReq)
-	require.Equal(t, http.StatusCreated, createW.Code)
-
-	var created models.Cupcake
-	err := json.Unmarshal(createW.Body.Bytes(), &created)
-	require.NoError(t, err)
-
-	req := httptest.NewRequest("GET", "/api/v1/cupcakes/"+fmt.Sprintf("%d", created.ID), nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusOK, w.Code)
-	require.Equal(t, "application/json", w.Header().Get("Content-Type"))
-
-	var response models.Cupcake
-	err = json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
-
-	require.Equal(t, created.ID, response.ID)
-	require.Equal(t, "Test Cupcake", response.Name)
-	require.Equal(t, "Test Flavor", response.Flavor)
-	require.Equal(t, 1000, response.PriceCents)
 }
 
-func TestUpdateCupcake_Returns200AndUpdatedBody(t *testing.T) {
-	router := newTestRouter(t)
-
-	reqBody := map[string]interface{}{
-		"name":        "Original",
-		"flavor":      "Original",
-		"price_cents": 1000,
+func TestGetCupcake(t *testing.T) {
+	tests := []struct {
+		name             string
+		cupcakeID        string
+		setupCupcake     map[string]interface{}
+		expectedStatus   int
+		expectedError    string
+		validateResponse func(t *testing.T, response models.Cupcake)
+	}{
+		{
+			name:      "valid ID returns 200",
+			cupcakeID: "1",
+			setupCupcake: map[string]interface{}{
+				"name":        "Chocolate Special",
+				"flavor":      "Belgian",
+				"price_cents": 1500,
+			},
+			expectedStatus: http.StatusOK,
+			validateResponse: func(t *testing.T, response models.Cupcake) {
+				require.Equal(t, uint(1), response.ID)
+				require.Equal(t, "Chocolate Special", response.Name)
+				require.Equal(t, "Belgian", response.Flavor)
+				require.Equal(t, 1500, response.PriceCents)
+			},
+		},
+		{
+			name:           "non-existent ID returns 404",
+			cupcakeID:      "9999",
+			expectedStatus: http.StatusNotFound,
+			expectedError:  "cupcake not found",
+		},
+		{
+			name:           "invalid ID format returns 400",
+			cupcakeID:      "invalid",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Invalid ID",
+		},
+		{
+			name:           "zero ID returns 400",
+			cupcakeID:      "0",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Invalid ID",
+		},
 	}
-	jsonBody, _ := json.Marshal(reqBody)
-	createReq := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody))
-	createReq.Header.Set("Content-Type", "application/json")
-	createW := httptest.NewRecorder()
-	router.ServeHTTP(createW, createReq)
-	require.Equal(t, http.StatusCreated, createW.Code)
 
-	var created models.Cupcake
-	err := json.Unmarshal(createW.Body.Bytes(), &created)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := newTestRouter(t)
 
-	updateBody := map[string]interface{}{
-		"name":        "Updated Name",
-		"flavor":      "Updated Flavor",
-		"price_cents": 2000,
+			if tt.setupCupcake != nil {
+				jsonBody, _ := json.Marshal(tt.setupCupcake)
+				req := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				router.ServeHTTP(w, req)
+				require.Equal(t, http.StatusCreated, w.Code)
+			}
+
+			req := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/cupcakes/%s", tt.cupcakeID), nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			require.Equal(t, tt.expectedStatus, w.Code)
+			require.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+			if tt.expectedError != "" {
+				require.Contains(t, w.Body.String(), tt.expectedError)
+			}
+
+			if tt.validateResponse != nil {
+				var response models.Cupcake
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				require.NoError(t, err)
+				tt.validateResponse(t, response)
+			}
+		})
 	}
-	updateJsonBody, _ := json.Marshal(updateBody)
-	updateReq := httptest.NewRequest("PUT", "/api/v1/cupcakes/"+fmt.Sprintf("%d", created.ID), bytes.NewBuffer(updateJsonBody))
-	updateReq.Header.Set("Content-Type", "application/json")
-	updateW := httptest.NewRecorder()
-	router.ServeHTTP(updateW, updateReq)
-
-	require.Equal(t, http.StatusOK, updateW.Code)
-	require.Equal(t, "application/json", updateW.Header().Get("Content-Type"))
-
-	var response models.Cupcake
-	err = json.Unmarshal(updateW.Body.Bytes(), &response)
-	require.NoError(t, err)
-
-	require.Equal(t, created.ID, response.ID)
-	require.Equal(t, "Updated Name", response.Name)
-	require.Equal(t, "Updated Flavor", response.Flavor)
-	require.Equal(t, 2000, response.PriceCents)
-	require.True(t, response.IsAvailable)
 }
 
-func TestUpdateCupcake_NotFound_Returns400(t *testing.T) {
-	router := newTestRouter(t)
-
-	updateBody := map[string]interface{}{
-		"name": "New Name",
+func TestUpdateCupcake(t *testing.T) {
+	tests := []struct {
+		name             string
+		cupcakeID        string
+		updatePayload    map[string]interface{}
+		setupCupcake     map[string]interface{}
+		expectedStatus   int
+		expectedError    string
+		validateResponse func(t *testing.T, response models.Cupcake)
+	}{
+		{
+			name:      "valid update returns 200",
+			cupcakeID: "1",
+			setupCupcake: map[string]interface{}{
+				"name":        "Original Name",
+				"flavor":      "Original Flavor",
+				"price_cents": 1000,
+			},
+			updatePayload: map[string]interface{}{
+				"name":         "Updated Name",
+				"flavor":       "Updated Flavor",
+				"price_cents":  2000,
+				"is_available": false,
+			},
+			expectedStatus: http.StatusOK,
+			validateResponse: func(t *testing.T, response models.Cupcake) {
+				require.Equal(t, "Updated Name", response.Name)
+				require.Equal(t, "Updated Flavor", response.Flavor)
+				require.Equal(t, 2000, response.PriceCents)
+				require.False(t, response.IsAvailable)
+			},
+		},
+		{
+			name:      "partial update returns 200",
+			cupcakeID: "1",
+			setupCupcake: map[string]interface{}{
+				"name":        "Original Name",
+				"flavor":      "Original Flavor",
+				"price_cents": 1000,
+			},
+			updatePayload: map[string]interface{}{
+				"name": "Updated Name Only",
+			},
+			expectedStatus: http.StatusOK,
+			validateResponse: func(t *testing.T, response models.Cupcake) {
+				require.Equal(t, "Updated Name Only", response.Name)
+				require.Equal(t, "Original Flavor", response.Flavor)
+				require.Equal(t, 1000, response.PriceCents)
+			},
+		},
+		{
+			name:           "non-existent ID returns 400",
+			cupcakeID:      "9999",
+			updatePayload:  map[string]interface{}{"name": "Updated"},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "record not found",
+		},
+		{
+			name:           "invalid ID format returns 400",
+			cupcakeID:      "invalid",
+			updatePayload:  map[string]interface{}{"name": "Updated"},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Invalid ID",
+		},
+		{
+			name:      "invalid update data returns 400",
+			cupcakeID: "1",
+			setupCupcake: map[string]interface{}{
+				"name":        "Original Name",
+				"flavor":      "Original Flavor",
+				"price_cents": 1000,
+			},
+			updatePayload: map[string]interface{}{
+				"name": "A",
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "name must have at least 2 characters",
+		},
 	}
-	updateJsonBody, _ := json.Marshal(updateBody)
-	updateReq := httptest.NewRequest("PUT", "/api/v1/cupcakes/999", bytes.NewBuffer(updateJsonBody))
-	updateReq.Header.Set("Content-Type", "application/json")
-	updateW := httptest.NewRecorder()
-	router.ServeHTTP(updateW, updateReq)
 
-	require.Equal(t, http.StatusBadRequest, updateW.Code)
-	require.Contains(t, updateW.Body.String(), "cupcake not found")
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := newTestRouter(t)
 
-func TestUpdateCupcake_InvalidID_Returns400(t *testing.T) {
-	router := newTestRouter(t)
+			if tt.setupCupcake != nil {
+				jsonBody, _ := json.Marshal(tt.setupCupcake)
+				req := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				router.ServeHTTP(w, req)
+				require.Equal(t, http.StatusCreated, w.Code)
+			}
 
-	updateBody := map[string]interface{}{
-		"name": "New Name",
+			jsonBody, _ := json.Marshal(tt.updatePayload)
+			req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/cupcakes/%s", tt.cupcakeID), bytes.NewBuffer(jsonBody))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			require.Equal(t, tt.expectedStatus, w.Code)
+			require.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+			if tt.expectedError != "" {
+				require.Contains(t, w.Body.String(), tt.expectedError)
+			}
+
+			if tt.validateResponse != nil {
+				var response models.Cupcake
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				require.NoError(t, err)
+				tt.validateResponse(t, response)
+			}
+		})
 	}
-	updateJsonBody, _ := json.Marshal(updateBody)
-	updateReq := httptest.NewRequest("PUT", "/api/v1/cupcakes/invalid", bytes.NewBuffer(updateJsonBody))
-	updateReq.Header.Set("Content-Type", "application/json")
-	updateW := httptest.NewRecorder()
-	router.ServeHTTP(updateW, updateReq)
-
-	require.Equal(t, http.StatusBadRequest, updateW.Code)
-	require.Contains(t, updateW.Body.String(), "Invalid ID")
 }
 
-func TestDeleteCupcake_Returns204(t *testing.T) {
-	router := newTestRouter(t)
-
-	reqBody := map[string]interface{}{
-		"name":        "To Delete",
-		"flavor":      "Delete Flavor",
-		"price_cents": 1000,
+func TestUpdateCupcake_InvalidJSON(t *testing.T) {
+	tests := []struct {
+		name           string
+		payload        string
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name:           "malformed JSON",
+			payload:        `{"name":"Test", "flavor":"Test", "price_cents":1000, "extra_field": "invalid"`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error decoding request",
+		},
+		{
+			name:           "invalid JSON syntax",
+			payload:        `{"name": "Test", "flavor": "Test", "price_cents": 1000,}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error decoding request",
+		},
+		{
+			name:           "empty string",
+			payload:        "",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error decoding request",
+		},
 	}
-	jsonBody, _ := json.Marshal(reqBody)
-	createReq := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody))
-	createReq.Header.Set("Content-Type", "application/json")
-	createW := httptest.NewRecorder()
-	router.ServeHTTP(createW, createReq)
-	require.Equal(t, http.StatusCreated, createW.Code)
 
-	var created models.Cupcake
-	err := json.Unmarshal(createW.Body.Bytes(), &created)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := newTestRouter(t)
 
-	deleteReq := httptest.NewRequest("DELETE", "/api/v1/cupcakes/"+fmt.Sprintf("%d", created.ID), nil)
-	deleteW := httptest.NewRecorder()
-	router.ServeHTTP(deleteW, deleteReq)
+			req := httptest.NewRequest("PUT", "/api/v1/cupcakes/1", bytes.NewBufferString(tt.payload))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusNoContent, deleteW.Code)
-	require.Empty(t, deleteW.Body.String())
-
-	getReq := httptest.NewRequest("GET", "/api/v1/cupcakes/"+fmt.Sprintf("%d", created.ID), nil)
-	getW := httptest.NewRecorder()
-	router.ServeHTTP(getW, getReq)
-
-	require.Equal(t, http.StatusNotFound, getW.Code)
+			require.Equal(t, tt.expectedStatus, w.Code)
+			require.Contains(t, w.Body.String(), tt.expectedError)
+		})
+	}
 }
 
-func TestDeleteCupcake_NotFound_Returns400(t *testing.T) {
-	router := newTestRouter(t)
+func TestDeleteCupcake(t *testing.T) {
+	tests := []struct {
+		name           string
+		cupcakeID      string
+		setupCupcake   map[string]interface{}
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name:      "valid ID returns 204",
+			cupcakeID: "1",
+			setupCupcake: map[string]interface{}{
+				"name":        "To Delete",
+				"flavor":      "Test Flavor",
+				"price_cents": 1000,
+			},
+			expectedStatus: http.StatusNoContent,
+		},
+		{
+			name:           "non-existent ID returns 400",
+			cupcakeID:      "9999",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "record not found",
+		},
+		{
+			name:           "invalid ID format returns 400",
+			cupcakeID:      "invalid",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Invalid ID",
+		},
+		{
+			name:           "zero ID returns 400",
+			cupcakeID:      "0",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Invalid ID",
+		},
+	}
 
-	deleteReq := httptest.NewRequest("DELETE", "/api/v1/cupcakes/999", nil)
-	deleteW := httptest.NewRecorder()
-	router.ServeHTTP(deleteW, deleteReq)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := newTestRouter(t)
 
-	require.Equal(t, http.StatusBadRequest, deleteW.Code)
-	require.Contains(t, deleteW.Body.String(), "cupcake not found")
+			if tt.setupCupcake != nil {
+				jsonBody, _ := json.Marshal(tt.setupCupcake)
+				req := httptest.NewRequest("POST", "/api/v1/cupcakes", bytes.NewBuffer(jsonBody))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				router.ServeHTTP(w, req)
+				require.Equal(t, http.StatusCreated, w.Code)
+			}
+
+			req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/cupcakes/%s", tt.cupcakeID), nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			require.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedError != "" {
+				require.Contains(t, w.Body.String(), tt.expectedError)
+			}
+		})
+	}
 }
 
-func TestDeleteCupcake_InvalidID_Returns400(t *testing.T) {
-	router := newTestRouter(t)
+func TestHealthCheck(t *testing.T) {
+	tests := []struct {
+		name             string
+		expectedStatus   int
+		validateResponse func(t *testing.T, response map[string]interface{})
+	}{
+		{
+			name:           "health check returns 200",
+			expectedStatus: http.StatusOK,
+			validateResponse: func(t *testing.T, response map[string]interface{}) {
+				require.Equal(t, "ok", response["status"])
+				require.Equal(t, "Cupcake Store API is running!", response["message"])
+			},
+		},
+	}
 
-	deleteReq := httptest.NewRequest("DELETE", "/api/v1/cupcakes/invalid", nil)
-	deleteW := httptest.NewRecorder()
-	router.ServeHTTP(deleteW, deleteReq)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := newHandler(t)
+			r := chi.NewRouter()
+			r.Get("/health", handler.HealthCheck)
 
-	require.Equal(t, http.StatusBadRequest, deleteW.Code)
-	require.Contains(t, deleteW.Body.String(), "Invalid ID")
+			req := httptest.NewRequest("GET", "/health", nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			require.Equal(t, tt.expectedStatus, w.Code)
+			require.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+			var response map[string]interface{}
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			require.NoError(t, err)
+
+			if tt.validateResponse != nil {
+				tt.validateResponse(t, response)
+			}
+		})
+	}
 }

@@ -10,6 +10,12 @@ import (
 	"github.com/julimonteiro/cupcake-store/internal/service"
 )
 
+func sendJSONError(w http.ResponseWriter, message string, statusCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
 type CupcakeHandler struct {
 	service *service.CupcakeService
 }
@@ -30,13 +36,13 @@ func (h *CupcakeHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 func (h *CupcakeHandler) CreateCupcake(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateCupcakeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Error decoding request", http.StatusBadRequest)
+		sendJSONError(w, "Error decoding request", http.StatusBadRequest)
 		return
 	}
 
 	cupcake, err := h.service.CreateCupcake(&req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		sendJSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -48,14 +54,14 @@ func (h *CupcakeHandler) CreateCupcake(w http.ResponseWriter, r *http.Request) {
 func (h *CupcakeHandler) GetCupcake(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+	if err != nil || id == 0 {
+		sendJSONError(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
 
 	cupcake, err := h.service.GetCupcake(uint(id))
 	if err != nil {
-		http.Error(w, "Cupcake not found", http.StatusNotFound)
+		sendJSONError(w, "cupcake not found", http.StatusNotFound)
 		return
 	}
 
@@ -66,7 +72,7 @@ func (h *CupcakeHandler) GetCupcake(w http.ResponseWriter, r *http.Request) {
 func (h *CupcakeHandler) GetAllCupcakes(w http.ResponseWriter, r *http.Request) {
 	cupcakes, err := h.service.GetAllCupcakes()
 	if err != nil {
-		http.Error(w, "Error fetching cupcakes", http.StatusInternalServerError)
+		sendJSONError(w, "Error fetching cupcakes", http.StatusInternalServerError)
 		return
 	}
 
@@ -77,20 +83,20 @@ func (h *CupcakeHandler) GetAllCupcakes(w http.ResponseWriter, r *http.Request) 
 func (h *CupcakeHandler) UpdateCupcake(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+	if err != nil || id == 0 {
+		sendJSONError(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
 
 	var req models.UpdateCupcakeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Error decoding request", http.StatusBadRequest)
+		sendJSONError(w, "Error decoding request", http.StatusBadRequest)
 		return
 	}
 
 	cupcake, err := h.service.UpdateCupcake(uint(id), &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		sendJSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -101,13 +107,13 @@ func (h *CupcakeHandler) UpdateCupcake(w http.ResponseWriter, r *http.Request) {
 func (h *CupcakeHandler) DeleteCupcake(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+	if err != nil || id == 0 {
+		sendJSONError(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
 
 	if err := h.service.DeleteCupcake(uint(id)); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		sendJSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

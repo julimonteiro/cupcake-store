@@ -18,6 +18,10 @@ func Init(cfg *config.Config) (db *gorm.DB, err error) {
 		gormLogger = logger.Default.LogMode(logger.Error)
 	}
 
+	if cfg.DBDSN == "" {
+		return nil, fmt.Errorf("error connecting to database: database DSN cannot be empty")
+	}
+
 	switch cfg.DBDialect {
 	case "postgres":
 		db, err = gorm.Open(postgres.Open(cfg.DBDSN), &gorm.Config{
